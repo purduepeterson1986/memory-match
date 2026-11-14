@@ -13,6 +13,8 @@
     { id: 'expert', name: 'Expert', cards: 48, grid: [8, 6] },
     { id: 'master', name: 'Master', cards: 64, grid: [8, 8] }
   ];
+  // Thinking time (ms) after the second math card is turned over, before answers are shown.
+  const MATH_THINK_MS = { add: 1000, addsub: 1000, mult: 1500, div: 1500, mixed: 2000 };
   const STORE_KEY = 'memory-match-settings-v1';
 
   /* ---------- settings ---------- */
@@ -386,7 +388,11 @@
 
     locked = true;
     const [a, b] = open;
-    cardEls[a].classList.add('solved'); cardEls[b].classList.add('solved');
+    // Math cards: give players time to work out the second card before the answers appear,
+    // then a moment to see the answers before the pair is judged.
+    const reveal = mathGame ? 450 + (MATH_THINK_MS[settings.mathLevel] || 1000) : 0;
+    const judge = mathGame ? reveal + 650 : 0;
+    if (mathGame) later(() => { cardEls[a].classList.add('solved'); cardEls[b].classList.add('solved'); }, reveal);
     const p = players[current];
     p.attempts++;
 
@@ -415,12 +421,12 @@
         } else {
           toast('Match! ' + p.name + ' goes again', p.color, 1100);
         }
-      }, 520);
+      }, judge || 520);
     } else {
       later(() => {
         Sound.miss();
         cardEls[a].classList.add('miss'); cardEls[b].classList.add('miss');
-      }, 560);
+      }, judge || 560);
       later(() => {
         [a, b].forEach((k) => { cardEls[k].classList.remove('miss', 'solved'); setFace(k, false); });
         open = []; locked = false;
@@ -428,7 +434,7 @@
         updatePlayers();
         Sound.turn();
         toast(players[current].name + '’s turn', players[current].color, 1000);
-      }, mathGame ? 5000 : 3500);
+      }, mathGame ? judge + 4400 : 3500);
     }
   }
 
