@@ -4,6 +4,7 @@
 
   const $ = (sel, root) => (root || document).querySelector(sel);
   const THEMES = window.MM_THEMES;
+  const MATH = window.MM_MATH;
   const PLAYER_COLORS = ['#ff7a7a', '#3fd4cf', '#ffc247', '#b197fc'];
   const LEVELS = [
     { id: 'easy', name: 'Easy', cards: 16, grid: [4, 4] },
@@ -15,7 +16,7 @@
   const STORE_KEY = 'memory-match-settings-v1';
 
   /* ---------- settings ---------- */
-  const settings = { players: 2, names: ['', '', '', ''], level: 'easy', theme: 'animals', sound: true };
+  const settings = { players: 2, names: ['', '', '', ''], level: 'easy', theme: 'animals', mathLevel: 'add', sound: true };
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
     if (saved && typeof saved === 'object') {
@@ -23,6 +24,7 @@
       if (Array.isArray(saved.names)) saved.names.slice(0, 4).forEach((n, i) => { settings.names[i] = String(n || '').slice(0, 14); });
       if (LEVELS.some((l) => l.id === saved.level)) settings.level = saved.level;
       if (THEMES.some((t) => t.id === saved.theme)) settings.theme = saved.theme;
+      if (MATH.LEVELS.some((m) => m.id === saved.mathLevel)) settings.mathLevel = saved.mathLevel;
       if (typeof saved.sound === 'boolean') settings.sound = saved.sound;
     }
   } catch (e) { /* storage unavailable: defaults are fine */ }
@@ -38,15 +40,20 @@
   };
   const levelById = (id) => LEVELS.find((l) => l.id === id);
   const themeById = (id) => THEMES.find((t) => t.id === id);
+  const mathLevelById = (id) => MATH.LEVELS.find((m) => m.id === id);
 
   /* ---------- card faces ---------- */
   function faceHTML(theme, item) {
     const label = theme.labels ? '<span class="label' + (item.kind === 'medal' ? ' serif' : '') + '">' + esc(item.name) + '</span>' : '';
     switch (item.kind) {
-      case 'color':
-        return '<span class="swatch" style="background:' + item.css + '"></span>' + label;
       case 'shape':
         return '<svg class="shape" viewBox="0 0 100 100" fill="' + item.color + '" aria-hidden="true">' + item.svg + '</svg>';
+      case 'math': {
+        // Shrink long problems so they always fit the card width.
+        const size = Math.min(0.3, 0.95 / (item.text.length * 0.52)).toFixed(3);
+        return '<span class="expr" style="font-size:calc(var(--cs) * ' + size + ')">' + esc(item.text) + '</span>' +
+          '<span class="ans">= ' + item.value + '</span>';
+      }
       case 'medal':
         return '<span class="medal" style="--c:' + item.color + '"><span class="glyph">' + item.glyph + '</span></span>' + label;
       default:
@@ -100,6 +107,8 @@
   const elLevels = $('#levels');
   const elThemes = $('#themes');
   const elSummary = $('#summary');
+  const elMathPanel = $('#panel-math');
+  const elMathLevels = $('#math-levels');
 
   function buildSetup() {
     elCount.innerHTML = [2, 3, 4].map((n) =>
@@ -131,6 +140,18 @@
         '</button>';
     }).join('');
 
+    elMathLevels.innerHTML = MATH.LEVELS.map((m) =>
+      '<button type="button" class="tile level" role="radio" data-math="' + m.id + '">' +
+      '<span class="check">✓</span><span class="math-sym">' + m.symbol + '</span>' +
+      '<span><span class="tile-name">' + m.name + '</span><br><span class="tile-sub">' + m.label + '</span></span>' +
+      '</button>').join('');
+    elMathLevels.addEventListener('click', (e) => {
+      const b = e.target.closest('.tile');
+      if (!b) return;
+      settings.mathLevel = b.dataset.math;
+      Sound.flip(); refreshSetup(); save();
+    });
+
     elCount.addEventListener('click', (e) => {
       const b = e.target.closest('.seg');
       if (!b) return;
@@ -148,6 +169,7 @@
       if (!b) return;
       settings.theme = b.dataset.theme;
       Sound.flip(); refreshSetup(); save();
+      if (settings.theme === 'math') elMathPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
     elNames.addEventListener('input', (e) => {
       const field = e.target.closest('.name-field');
@@ -189,8 +211,17 @@
       const on = b.dataset.theme === settings.theme;
       b.classList.toggle('selected', on); b.setAttribute('aria-checked', on);
     });
+    const isMath = settings.theme === 'math';
+    const m = mathLevelById(settings.mathLevel);
+    elMathPanel.hidden = !isMath;
+    elMathLevels.querySelectorAll('.tile').forEach((b) => {
+      const on = b.dataset.math === settings.mathLevel;
+      b.classList.toggle('selected', on); b.setAttribute('aria-checked', on);
+    });
+    $('#math-hint').textContent = 'Example match: ' + m.example + '. Bigger boards use bigger numbers.';
     const l = levelById(settings.level);
-    elSummary.innerHTML = '<b>' + settings.players + ' players</b> · <b>' + l.name + '</b> (' + l.cards + ' cards) · <b>' + esc(themeById(settings.theme).name) + '</b>';
+    elSummary.innerHTML = '<b>' + settings.players + ' players</b> · <b>' + l.name + '</b> (' + l.cards + ' cards) · <b>' + esc(themeById(settings.theme).name) +
+      (isMath ? ' ' + m.name + '</b> (' + m.label + ')' : '</b>');
   }
 
   /* ============================================================
@@ -214,6 +245,7 @@
   let token = 0;        // invalidates pending timers when a game is restarted
   let startIndex = 0;   // rotates who goes first on "Play again"
   let playing = false;
+  let mathGame = false; // math cards stay up longer on a miss and show their answers
 
   const later = (fn, ms) => { const t = token; setTimeout(() => { if (t === token) fn(); }, ms); };
 
@@ -249,11 +281,16 @@
     current = startIndex % players.length;
 
     deck = [];
-    pickItems(theme, totalPairs).forEach((item, pair) => { deck.push({ pair, item }, { pair, item }); });
+    mathGame = theme.id === 'math';
+    if (mathGame) {
+      MATH.generate(settings.mathLevel, totalPairs).forEach(([a, b], pair) => { deck.push({ pair, item: a }, { pair, item: b }); });
+    } else {
+      pickItems(theme, totalPairs).forEach((item, pair) => { deck.push({ pair, item }, { pair, item }); });
+    }
     shuffle(deck);
     deck.forEach((c) => { c.matched = false; c.up = false; });
 
-    $('#level-label').textContent = level.name + ' · ' + theme.name;
+    $('#level-label').textContent = level.name + ' · ' + theme.name + (mathGame ? ' ' + mathLevelById(settings.mathLevel).name : '');
     renderPlayers();
     renderBoard(theme);
     updateProgress();
@@ -349,6 +386,7 @@
 
     locked = true;
     const [a, b] = open;
+    cardEls[a].classList.add('solved'); cardEls[b].classList.add('solved');
     const p = players[current];
     p.attempts++;
 
@@ -384,13 +422,13 @@
         cardEls[a].classList.add('miss'); cardEls[b].classList.add('miss');
       }, 560);
       later(() => {
-        [a, b].forEach((k) => { cardEls[k].classList.remove('miss'); setFace(k, false); });
+        [a, b].forEach((k) => { cardEls[k].classList.remove('miss', 'solved'); setFace(k, false); });
         open = []; locked = false;
         current = (current + 1) % players.length;
         updatePlayers();
         Sound.turn();
         toast(players[current].name + '’s turn', players[current].color, 1000);
-      }, 3500);
+      }, mathGame ? 5000 : 3500);
     }
   }
 

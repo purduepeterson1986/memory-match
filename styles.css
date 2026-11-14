@@ -334,10 +334,6 @@ h1, h2, p { margin: 0; }
 
 /* ---- face contents (shared by board cards and setup previews) ---- */
 .glyph { font-size: calc(var(--cs) * .58); line-height: 1; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
-.swatch {
-  width: calc(var(--cs) * .6); height: calc(var(--cs) * .6); flex: none; border-radius: 24%;
-  box-shadow: inset 0 0 0 max(1.5px, calc(var(--cs) * .02)) rgba(0, 0, 0, .2), inset 0 calc(var(--cs) * -.05) calc(var(--cs) * .08) rgba(0, 0, 0, .14), 0 2px 5px rgba(0, 0, 0, .2);
-}
 .shape { width: calc(var(--cs) * .68); height: calc(var(--cs) * .68); flex: none; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .22)); }
 .medal {
   width: calc(var(--cs) * .58); height: calc(var(--cs) * .58); flex: none; border-radius: 50%;
@@ -353,8 +349,25 @@ h1, h2, p { margin: 0; }
 }
 .label.serif { font-family: var(--serif); font-weight: 700; font-size: max(9px, calc(var(--cs) * .135)); }
 .board.tiny .label { display: none; }
-.board.tiny .medal, .board.tiny .swatch { width: calc(var(--cs) * .72); height: calc(var(--cs) * .72); }
+.board.tiny .medal { width: calc(var(--cs) * .72); height: calc(var(--cs) * .72); }
 .board.tiny .medal .glyph { font-size: calc(var(--cs) * .42); }
+
+/* ---- math cards ---- */
+.expr { font-weight: 800; white-space: nowrap; letter-spacing: -.01em; line-height: 1; font-variant-numeric: tabular-nums; }
+.ans {
+  position: absolute; left: 0; right: 0; bottom: 7%; text-align: center;
+  font-size: max(10px, calc(var(--cs) * .15)); font-weight: 800; color: #c07a08;
+  opacity: 0; transition: opacity .3s ease;
+}
+.card.solved .ans { opacity: 1; transition-delay: .5s; }
+.mini-card .ans { display: none; }
+.mini-card { color: #24264a; }
+.math-sym {
+  height: 54px; display: grid; place-items: center; white-space: nowrap;
+  font-size: 2rem; font-weight: 800; color: #9aa2ff;
+}
+.tile.selected .math-sym { color: var(--gold); }
+.panel[hidden] { display: none; }
 
 /* ---- card states ---- */
 .card.miss .card-inner { animation: shake .45s ease; }
@@ -461,7 +474,8 @@ h1, h2, p { margin: 0; }
   .pscore { flex-direction: row; align-items: baseline; gap: 4px; }
   .pscore .num { font-size: 1.4rem; }
   .theme-preview { --cs: 40px; gap: 4px; }
-  .mini-grid { height: 44px; }
+  .mini-grid, .math-sym { height: 44px; }
+  .math-sym { font-size: 1.5rem; }
 }
 @media (max-width: 480px) {
   .levels { grid-template-columns: repeat(3, 1fr); }

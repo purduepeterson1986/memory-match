@@ -4,29 +4,6 @@
 
   const emoji = (list) => list.map(([glyph, name]) => ({ kind: 'emoji', glyph, name }));
 
-  /* ---------- Colors ---------- */
-  const SOLIDS = [
-    ['Red', '#e53935'], ['Orange', '#fb8c00'], ['Yellow', '#fdd835'], ['Lime', '#9ccc3c'],
-    ['Green', '#2e9e4f'], ['Teal', '#00a99d'], ['Sky', '#4fc3f7'], ['Blue', '#1e63d6'],
-    ['Navy', '#1a2a6c'], ['Purple', '#8e3fc8'], ['Pink', '#f48fb1'], ['Magenta', '#d81b9a'],
-    ['Brown', '#7b4a2a'], ['White', '#ffffff'], ['Gray', '#8a8f98'], ['Black', '#1b1b1f']
-  ];
-  const hex = Object.fromEntries(SOLIDS);
-  const DUOS = [
-    ['Red', 'Yellow'], ['Blue', 'White'], ['Green', 'Yellow'], ['Purple', 'Pink'],
-    ['Orange', 'Black'], ['Teal', 'Navy'], ['Pink', 'Sky'], ['Brown', 'Lime'],
-    ['Black', 'White'], ['Red', 'Blue'], ['Yellow', 'Purple'], ['Green', 'White'],
-    ['Orange', 'Sky'], ['Magenta', 'Yellow'], ['Navy', 'Orange'], ['Gray', 'Red']
-  ];
-  const colors = [
-    ...SOLIDS.map(([name, c]) => ({ kind: 'color', name, css: c })),
-    ...DUOS.map(([a, b]) => ({
-      kind: 'color',
-      name: a + ' & ' + b,
-      css: 'linear-gradient(135deg, ' + hex[a] + ' 0 50%, ' + hex[b] + ' 50% 100%)'
-    }))
-  ];
-
   /* ---------- Shapes (drawn in a 100 x 100 box) ---------- */
   const pts = (n, outer, inner, rot) => {
     const out = [];
@@ -134,13 +111,14 @@
 
   window.MM_THEMES = [
     { id: 'animals', name: 'Animals', blurb: 'Furry, feathered and finned', items: animals },
-    { id: 'colors', name: 'Colors', blurb: 'Solids, then two-tone on big boards', items: colors, tiered: true, labels: true, preview: [0, 7, 2, 9] },
     { id: 'shapes', name: 'Shapes', blurb: 'Match the shape and its color', items: shapes, tiered: true, preview: [3, 4, 0, 10] },
     { id: 'pictures', name: 'Pictures', blurb: 'Things that go, play and shine', items: pictures, preview: [1, 20, 8, 16] },
     { id: 'food', name: 'Food', blurb: 'Snacks, sweets and fresh fruit', items: food, preview: [3, 14, 22, 26] },
     { id: 'faces', name: 'Emoji Faces', blurb: 'Happy, sad, silly and surprised', items: faces, preview: [0, 5, 4, 9] },
     { id: 'sports', name: 'Sports', blurb: 'Balls, boards, skates and medals', items: sports, preview: [0, 1, 2, 28] },
     { id: 'flags', name: 'Flags', blurb: 'Countries from around the world', items: flags, labels: true, preview: [0, 1, 5, 21] },
+    { id: 'math', name: 'Math', blurb: 'Match cards with the same answer', preview: [0, 1, 2, 3],
+      items: [['2 + 3', 5], ['9 − 4', 5], ['3 × 4', 12], ['8 ÷ 2', 4]].map(([text, value]) => ({ kind: 'math', text, value, name: text })) },
     { id: 'lotr', name: 'Lord of the Rings', blurb: 'Characters of Middle-earth', items: lotr, labels: true, preview: [4, 0, 15, 6] }
   ];
 })();
