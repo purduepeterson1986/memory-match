@@ -6,6 +6,13 @@
   const THEMES = window.MM_THEMES;
   const MATH = window.MM_MATH;
   const PLAYER_COLORS = ['#ff7a7a', '#3fd4cf', '#ffc247', '#b197fc'];
+  // Computer players: how likely each face-up card is to be remembered, and how many cards it can hold in memory.
+  const SKILLS = {
+    easy: { name: 'Easy', recall: 0.4, memory: 6 },
+    medium: { name: 'Medium', recall: 0.7, memory: 12 },
+    hard: { name: 'Hard', recall: 0.95, memory: Infinity }
+  };
+  const CPU_PAUSE = 900;   // ms a computer waits between its moves so people can follow along
   const LEVELS = [
     { id: 'easy', name: 'Easy', cards: 16, grid: [4, 4] },
     { id: 'medium', name: 'Medium', cards: 24, grid: [6, 4] },
@@ -18,12 +25,17 @@
   const STORE_KEY = 'memory-match-settings-v1';
 
   /* ---------- settings ---------- */
-  const settings = { players: 2, names: ['', '', '', ''], level: 'easy', theme: 'animals', mathLevel: 'add', sound: true };
+  const settings = {
+    players: 2, names: ['', '', '', ''], types: ['human', 'human', 'human', 'human'], skills: ['medium', 'medium', 'medium', 'medium'],
+    level: 'easy', theme: 'animals', mathLevel: 'add', sound: true
+  };
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
     if (saved && typeof saved === 'object') {
       if ([2, 3, 4].includes(saved.players)) settings.players = saved.players;
       if (Array.isArray(saved.names)) saved.names.slice(0, 4).forEach((n, i) => { settings.names[i] = String(n || '').slice(0, 14); });
+      if (Array.isArray(saved.types)) saved.types.slice(0, 4).forEach((t, i) => { settings.types[i] = t === 'cpu' ? 'cpu' : 'human'; });
+      if (Array.isArray(saved.skills)) saved.skills.slice(0, 4).forEach((s, i) => { if (SKILLS[s]) settings.skills[i] = s; });
       if (LEVELS.some((l) => l.id === saved.level)) settings.level = saved.level;
       if (THEMES.some((t) => t.id === saved.theme)) settings.theme = saved.theme;
       if (MATH.LEVELS.some((m) => m.id === saved.mathLevel)) settings.mathLevel = saved.mathLevel;
@@ -105,7 +117,7 @@
      SETUP SCREEN
      ============================================================ */
   const elCount = $('#player-count');
-  const elNames = $('#names');
+  const elSeats = $('#seats');
   const elLevels = $('#levels');
   const elThemes = $('#themes');
   const elSummary = $('#summary');
@@ -116,12 +128,18 @@
     elCount.innerHTML = [2, 3, 4].map((n) =>
       '<button type="button" class="seg" role="radio" data-n="' + n + '" aria-label="' + n + ' players">' + n + '</button>').join('');
 
-    elNames.innerHTML = PLAYER_COLORS.map((c, i) =>
-      '<label class="name-field" style="--pc:' + c + '" data-i="' + i + '">' +
-      '<span class="avatar">' + (i + 1) + '</span>' +
-      '<input type="text" maxlength="14" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" ' +
-      'placeholder="Player ' + (i + 1) + '" aria-label="Player ' + (i + 1) + ' name" value="' + esc(settings.names[i]) + '">' +
-      '</label>').join('');
+    elSeats.innerHTML = PLAYER_COLORS.map((c, i) =>
+      '<div class="seat" style="--pc:' + c + '" data-i="' + i + '">' +
+      '<span class="avatar"></span>' +
+      '<input type="text" maxlength="14" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" aria-label="Player ' + (i + 1) + ' name">' +
+      '<div class="seat-opts">' +
+      '<div class="segmented small" role="radiogroup" aria-label="Who plays player ' + (i + 1) + '">' +
+      '<button type="button" class="seg" role="radio" data-type="human">Person</button>' +
+      '<button type="button" class="seg" role="radio" data-type="cpu">Computer</button></div>' +
+      '<div class="segmented small skill" role="radiogroup" aria-label="Computer skill for player ' + (i + 1) + '">' +
+      Object.keys(SKILLS).map((k) => '<button type="button" class="seg" role="radio" data-skill="' + k + '">' + SKILLS[k].name + '</button>').join('') +
+      '</div></div></div>').join('');
+    elSeats.querySelectorAll('.seat input').forEach((input, i) => { input.value = settings.names[i]; });
 
     elLevels.innerHTML = LEVELS.map((l) => {
       const [c, r] = l.grid;
@@ -173,17 +191,27 @@
       Sound.flip(); refreshSetup(); save();
       if (settings.theme === 'math') elMathPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
-    elNames.addEventListener('input', (e) => {
-      const field = e.target.closest('.name-field');
-      if (!field) return;
-      const i = Number(field.dataset.i);
+    elSeats.addEventListener('click', (e) => {
+      const seat = e.target.closest('.seat');
+      if (!seat) return;
+      const i = Number(seat.dataset.i);
+      const type = e.target.closest('[data-type]'), skill = e.target.closest('[data-skill]');
+      if (type) settings.types[i] = type.dataset.type;
+      else if (skill) settings.skills[i] = skill.dataset.skill;
+      else return;
+      Sound.flip(); refreshSetup(); save();
+    });
+    elSeats.addEventListener('input', (e) => {
+      const seat = e.target.closest('.seat');
+      if (!seat) return;
+      const i = Number(seat.dataset.i);
       settings.names[i] = e.target.value;
-      $('.avatar', field).textContent = initial(e.target.value, i);
+      $('.avatar', seat).textContent = avatarText(i);
       save();
     });
-    elNames.addEventListener('keydown', (e) => {
+    elSeats.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
-      const inputs = [...elNames.querySelectorAll('.name-field:not([hidden]) input')];
+      const inputs = [...elSeats.querySelectorAll('.seat:not([hidden]) input')];
       const next = inputs[inputs.indexOf(e.target) + 1];
       if (next) next.focus(); else e.target.blur();
     });
@@ -195,15 +223,45 @@
     const n = String(name || '').trim();
     return n ? Array.from(n)[0].toUpperCase() : String(i + 1);
   }
+  const isCpu = (i) => settings.types[i] === 'cpu';
+  const avatarText = (i) => (isCpu(i) ? '🤖' : initial(settings.names[i], i));
+
+  // Names for the players in this game. Blank computer seats become "Computer", or "Computer 1", "Computer 2"...
+  function seatNames() {
+    let blankCpu = 0;
+    for (let i = 0; i < settings.players; i++) if (isCpu(i) && !settings.names[i].trim()) blankCpu++;
+    let k = 0;
+    const out = [];
+    for (let i = 0; i < settings.players; i++) {
+      const nm = settings.names[i].trim();
+      if (nm) out.push(nm);
+      else if (isCpu(i)) { k++; out.push(blankCpu > 1 ? 'Computer ' + k : 'Computer'); }
+      else out.push('Player ' + (i + 1));
+    }
+    return out;
+  }
 
   function refreshSetup() {
     elCount.querySelectorAll('.seg').forEach((b) => {
       const on = Number(b.dataset.n) === settings.players;
       b.classList.toggle('selected', on); b.setAttribute('aria-checked', on);
     });
-    elNames.querySelectorAll('.name-field').forEach((f, i) => {
-      f.hidden = i >= settings.players;
-      $('.avatar', f).textContent = initial(settings.names[i], i);
+    elSeats.querySelectorAll('.seat').forEach((row, i) => {
+      row.hidden = i >= settings.players;
+      const input = $('input', row);
+      input.placeholder = isCpu(i) ? 'Computer' : 'Player ' + (i + 1);
+      if (input.value !== settings.names[i]) input.value = settings.names[i];
+      $('.avatar', row).textContent = avatarText(i);
+      row.querySelectorAll('[data-type]').forEach((b) => {
+        const on = b.dataset.type === settings.types[i];
+        b.classList.toggle('selected', on); b.setAttribute('aria-checked', on);
+      });
+      const skill = $('.skill', row);
+      skill.hidden = !isCpu(i);
+      skill.querySelectorAll('[data-skill]').forEach((b) => {
+        const on = b.dataset.skill === settings.skills[i];
+        b.classList.toggle('selected', on); b.setAttribute('aria-checked', on);
+      });
     });
     elLevels.querySelectorAll('.tile').forEach((b) => {
       const on = b.dataset.level === settings.level;
@@ -222,7 +280,10 @@
     });
     $('#math-hint').textContent = 'Example match: ' + m.example + '. Bigger boards use bigger numbers.';
     const l = levelById(settings.level);
-    elSummary.innerHTML = '<b>' + settings.players + ' players</b> · <b>' + l.name + '</b> (' + l.cards + ' cards) · <b>' + esc(themeById(settings.theme).name) +
+    let cpus = 0;
+    for (let i = 0; i < settings.players; i++) if (isCpu(i)) cpus++;
+    const who = settings.players + ' players' + (cpus ? ' (' + cpus + (cpus === 1 ? ' computer' : ' computers') + ')' : '');
+    elSummary.innerHTML = '<b>' + who + '</b> · <b>' + l.name + '</b> (' + l.cards + ' cards) · <b>' + esc(themeById(settings.theme).name) +
       (isMath ? ' ' + m.name + '</b> (' + m.label + ')' : '</b>');
   }
 
@@ -275,10 +336,13 @@
     totalPairs = level.cards / 2;
     found = 0; open = []; locked = false; playing = true;
 
+    const names = seatNames();
     players = Array.from({ length: settings.players }, (_, i) => ({
-      name: settings.names[i].trim() || 'Player ' + (i + 1),
-      initial: initial(settings.names[i], i),
-      color: PLAYER_COLORS[i], score: 0, attempts: 0
+      name: names[i],
+      initial: avatarText(i),
+      color: PLAYER_COLORS[i], score: 0, attempts: 0,
+      cpu: isCpu(i), skill: settings.skills[i],
+      seen: new Set()     // cards a computer player has noticed and can still remember
     }));
     current = startIndex % players.length;
 
@@ -299,6 +363,7 @@
     show('game');
     layoutBoard();
     later(() => toast(players[current].name + ' goes first', players[current].color), 350);
+    if (players[current].cpu) cpuSoon(1400);
   }
 
   function renderPlayers() {
@@ -319,7 +384,7 @@
       const p = players[i];
       const active = playing && i === current;
       el.classList.toggle('active', active);
-      $('.pturn', el).textContent = active ? 'Your turn' : '';
+      $('.pturn', el).textContent = active ? (p.cpu ? 'Thinking…' : 'Your turn') : (p.cpu ? 'Computer · ' + SKILLS[p.skill].name : '');
       const num = $('.num', el);
       num.textContent = p.score;
       $('.unit', el).textContent = p.score === 1 ? 'pair' : 'pairs';
@@ -375,6 +440,49 @@
     c.up = up;
     el.classList.toggle('flipped', up);
     el.setAttribute('aria-label', 'Card ' + (i + 1) + (up ? ': ' + c.item.name : ', face down'));
+    if (up) players.forEach((p) => {
+      if (!p.cpu || Math.random() > SKILLS[p.skill].recall) return;
+      p.seen.delete(i); p.seen.add(i);
+      while (p.seen.size > SKILLS[p.skill].memory) p.seen.delete(p.seen.values().next().value);
+    });
+  }
+
+  /* ---------- computer players ---------- */
+  const partnerOf = (i) => deck.findIndex((c, j) => j !== i && c.pair === deck[i].pair);
+  const isHidden = (i) => !deck[i].matched && !deck[i].up;
+
+  // Choose the next card for a computer player: use what it remembers, otherwise explore.
+  function cpuChoose(p) {
+    const hidden = [];
+    deck.forEach((c, i) => { if (isHidden(i)) hidden.push(i); });
+    if (!hidden.length) return null;
+    const pick = (list) => list[Math.floor(Math.random() * list.length)];
+    const remembered = (i) => i >= 0 && p.seen.has(i) && isHidden(i);
+
+    if (open.length === 1) {
+      const mate = partnerOf(open[0]);
+      if (remembered(mate)) return mate;
+      return pick(hidden);
+    }
+    const known = hidden.find((i) => remembered(i) && remembered(partnerOf(i)));
+    if (known !== undefined) return known;
+    const unseen = hidden.filter((i) => !p.seen.has(i));   // new cards give the most information
+    return pick(unseen.length ? unseen : hidden);
+  }
+
+  function cpuSoon(ms) {
+    const t = token;
+    setTimeout(() => { if (t === token) cpuStep(); }, ms);
+  }
+
+  function cpuStep() {
+    const p = players[current];
+    if (!playing || locked || !p || !p.cpu) return;
+    if (!elLayer.hidden) { cpuSoon(400); return; }     // wait while a box is open on screen
+    const card = cpuChoose(p);
+    if (card == null) return;
+    onCard(card);
+    if (open.length === 1) cpuSoon(CPU_PAUSE);         // second card follows a moment later
   }
 
   function onCard(i) {
@@ -409,6 +517,7 @@
           badge.textContent = p.initial;
           $('.card-front', el).appendChild(badge);
         });
+        players.forEach((q) => { q.seen.delete(a); q.seen.delete(b); });
         p.score++; found++;
         open = []; locked = false;
         Sound.match();
@@ -420,6 +529,7 @@
           later(endGame, 900);
         } else {
           toast('Match! ' + p.name + ' goes again', p.color, 1100);
+          if (p.cpu) cpuSoon(CPU_PAUSE);
         }
       }, judge || 520);
     } else {
@@ -434,13 +544,15 @@
         updatePlayers();
         Sound.turn();
         toast(players[current].name + '’s turn', players[current].color, 1000);
+        if (players[current].cpu) cpuSoon(CPU_PAUSE);
       }, mathGame ? judge + 4400 : 3500);
     }
   }
 
   elBoard.addEventListener('click', (e) => {
     const el = e.target.closest('.card');
-    if (el) onCard(Number(el.dataset.i));
+    if (!el || (players[current] && players[current].cpu)) return;   // a computer's turn: cards are not for people to touch
+    onCard(Number(el.dataset.i));
   });
   elBoard.addEventListener('contextmenu', (e) => e.preventDefault());
   elBoard.addEventListener('animationend', (e) => {

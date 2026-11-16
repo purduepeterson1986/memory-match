@@ -14,7 +14,8 @@ A card-matching memory game for 2 to 4 players, played in any web browser with a
 
 ## Settings
 
-- **Players:** 2, 3 or 4. Names are optional.
+- **Players:** 2, 3 or 4. Each player can be a **Person** or the **Computer**. Names are optional.
+- **Computer skill:** Easy, Medium or Hard. The computer remembers some of the cards it has seen. Easy forgets most of them, Hard remembers nearly all of them.
 - **Difficulty:** sets the number of cards.
 
   | Level | Cards |
