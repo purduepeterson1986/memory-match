@@ -80,6 +80,8 @@
     ctx: null,
     ensure() {
       if (!settings.sound) return null;
+      // iPhone and iPad: "playback" lets sounds play even when the side switch is set to silent.
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* not supported */ }
       try {
         if (!this.ctx) {
           const AC = window.AudioContext || window.webkitAudioContext;
