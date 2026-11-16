@@ -15,7 +15,7 @@ A card-matching memory game for 2 to 4 players, played in any web browser with a
 ## Settings
 
 - **Players:** 2, 3 or 4. Each player can be a **Person** or the **Computer**. Names are optional.
-- **Computer skill:** Easy, Medium or Hard. The computer remembers some of the cards it has seen. Easy forgets most of them, Hard remembers nearly all of them.
+- **Computer skill:** Easy, Medium or Hard. The computer remembers some of the cards it has seen. Easy forgets most of them, Hard remembers most of them.
 - **Difficulty:** sets the number of cards.
 
   | Level | Cards |
@@ -40,6 +40,7 @@ A card-matching memory game for 2 to 4 players, played in any web browser with a
 ## Features
 
 - Scores for every player are always visible, with the current player highlighted.
+- Win counts: each player's wins are shown during play. Press **Next game** to keep playing with the same settings and build up a run of wins. Changing any setting, or going back to the settings screen, starts the count again from zero. A tied game is not a win. Wins are not saved when the page is closed.
 - The board arranges itself to fit the screen, from a phone to a large touch-screen monitor.
 - Sound effects with a mute button, and a full-screen button.
 - Can be installed as an app from the browser.

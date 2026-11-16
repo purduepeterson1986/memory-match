@@ -10,7 +10,7 @@
   const SKILLS = {
     easy: { name: 'Easy', recall: 0.4, memory: 6 },
     medium: { name: 'Medium', recall: 0.7, memory: 12 },
-    hard: { name: 'Hard', recall: 0.95, memory: Infinity }
+    hard: { name: 'Hard', recall: 0.9, memory: Infinity }
   };
   const CPU_PAUSE = 900;   // ms a computer waits between its moves so people can follow along
   const LEVELS = [
@@ -209,6 +209,7 @@
       const i = Number(seat.dataset.i);
       settings.names[i] = e.target.value;
       $('.avatar', seat).textContent = avatarText(i);
+      resetSeries();
       save();
     });
     elSeats.addEventListener('keydown', (e) => {
@@ -244,6 +245,7 @@
   }
 
   function refreshSetup() {
+    resetSeries();   // any change on the settings screen starts a fresh run of games
     elCount.querySelectorAll('.seg').forEach((b) => {
       const on = Number(b.dataset.n) === settings.players;
       b.classList.toggle('selected', on); b.setAttribute('aria-checked', on);
@@ -311,6 +313,11 @@
   let startIndex = 0;   // rotates who goes first on "Play again"
   let playing = false;
   let mathGame = false; // math cards stay up longer on a miss and show their answers
+  // Wins across a run of games. Kept while players press "Next game"; cleared whenever
+  // the settings screen is shown or a setting changes. Not saved between visits.
+  let series = { wins: [0, 0, 0, 0], games: 0 };
+  const resetSeries = () => { series = { wins: [0, 0, 0, 0], games: 0 }; };
+  const winsText = (n) => n + (n === 1 ? ' win' : ' wins');
 
   const later = (fn, ms) => { const t = token; setTimeout(() => { if (t === token) fn(); }, ms); };
 
@@ -373,7 +380,7 @@
     elPlayers.innerHTML = players.map((p, i) =>
       '<div class="player" data-i="' + i + '" style="--pc:' + p.color + '">' +
       '<span class="avatar">' + esc(p.initial) + '</span>' +
-      '<div class="pinfo"><div class="pname"><span class="pn">' + esc(p.name) + '</span><span class="crown" hidden>👑</span></div><div class="pturn"></div></div>' +
+      '<div class="pinfo"><div class="pname"><span class="pn">' + esc(p.name) + '</span><span class="crown" hidden>👑</span></div><div class="pturn"></div><div class="pwins"></div></div>' +
       '<div class="pscore"><span class="num">0</span><span class="unit">pairs</span></div>' +
       '</div>').join('');
     updatePlayers();
@@ -391,6 +398,7 @@
       num.textContent = p.score;
       $('.unit', el).textContent = p.score === 1 ? 'pair' : 'pairs';
       $('.crown', el).hidden = !(top > 0 && p.score === top && leaders === 1);
+      $('.pwins', el).textContent = winsText(series.wins[i]);
       el.setAttribute('aria-label', p.name + ': ' + p.score + (p.score === 1 ? ' pair' : ' pairs') + (active ? ', current turn' : ''));
       if (bumped === i) { num.classList.remove('bump'); void num.offsetWidth; num.classList.add('bump'); }
     });
@@ -586,9 +594,14 @@
     const top = Math.max(...players.map((p) => p.score));
     const winners = players.filter((p) => p.score === top);
     const ranked = players.slice().sort((a, b) => b.score - a.score);
+    // A tie is not a win: only a single winner adds to the run's tally.
+    series.games++;
+    if (winners.length === 1) series.wins[players.indexOf(winners[0])]++;
+    updatePlayers();
     const title = winners.length === 1
       ? esc(winners[0].name) + ' wins!'
       : 'It’s a tie!';
+    const standings = players.map((p, i) => esc(p.name) + ' ' + series.wins[i]).join(' · ');
     const sub = winners.length === 1
       ? 'With ' + top + ' of ' + totalPairs + ' pairs. Well played, everyone.'
       : winners.map((w) => esc(w.name)).join(winners.length === 2 ? ' and ' : ', ') + ' share the win with ' + top + ' pairs each.';
@@ -607,9 +620,11 @@
     Sound.win();
     startConfetti(winners.map((w) => w.color));
     openModal(
-      '<div class="trophy">🏆</div><h2 id="modal-title">' + title + '</h2><p class="sub">' + sub + '</p><div class="ranks">' + rows + '</div>',
+      '<div class="trophy">🏆</div><h2 id="modal-title">' + title + '</h2><p class="sub">' + sub + '</p>' +
+        '<p class="series">Wins in this run (' + series.games + (series.games === 1 ? ' game' : ' games') + '): ' + standings + '</p>' +
+        '<div class="ranks">' + rows + '</div>',
       [
-        { label: 'Play again', primary: true, run: () => { startIndex++; startGame(); } },
+        { label: 'Next game', primary: true, run: () => { startIndex++; startGame(); } },
         { label: 'Change settings', run: toSetup }
       ]
     );
@@ -618,6 +633,7 @@
   function toSetup() {
     token++;
     playing = false;
+    resetSeries();
     closeModal();
     stopConfetti();
     elToast.classList.remove('show');

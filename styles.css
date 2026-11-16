@@ -264,6 +264,8 @@ h1, h2, p { margin: 0; }
 .pname { font-weight: 800; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pname .crown { margin-left: 6px; }
 .pturn { font-size: .8rem; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .08em; height: 1.2em; }
+.pwins { font-size: .78rem; font-weight: 700; color: var(--ink-dim); }
+.modal .series { color: var(--ink-faint); font-size: .9rem; font-weight: 600; margin-top: 10px; line-height: 1.4; }
 .player.active .pturn { color: var(--pc); }
 .pscore { display: flex; flex-direction: column; align-items: center; line-height: 1; min-width: 46px; }
 .pscore .num { font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
